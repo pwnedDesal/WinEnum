@@ -7,7 +7,9 @@ $text = "#POWERSHELL VERSION"
 $filePath = "output.txt"
 # Use Out-File to append the text to the file
 $text | Out-File -FilePath $filePath -Append
+echo "Reading Registry(PowershellVersion)"
 reg query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\PowerShell\1\PowershellEngine /v PowershellVersion |  Out-File -FilePath $filePath -Append
+echo "Reading Registry"
 reg query HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\PowerShell\3\PowershellEngine /v PowershellVersion |  Out-File -FilePath $filePath -Append
 $text = "Accessing Reg keys to find powershell version....."
 $text |  Out-File -FilePath $filePath -Append
@@ -16,8 +18,11 @@ $text = "#IDENTIFYING POWERSHELL LOGGING"
 $text |  Out-File -FilePath $filePath -Append
 $text = "Accessing Reg keys to find powershell version....."
 $text |  Out-File -FilePath $filePath -Append
+echo "Reading Registry(Transcription)"
 reg query HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\Transcription |  Out-File -FilePath $filePath -Append
+echo "Reading Registry(ModuleLogging)"
 reg query HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\ModuleLogging |  Out-File -FilePath $filePath -Append
+echo "Reading Registry(ScriptBlockLogging)"
 reg query HKEY_LOCAL_MACHINE\SOFTWARE\Wow6432Node\Policies\Microsoft\Windows\PowerShell\ScriptBlockLogging |  Out-File -FilePath $filePath -Append
 $text = "#IDENTIFYING AVAILABLE COMMON LANGUAGE RUNTIME(CLR) VERSIONS"
 $text |  Out-File -FilePath $filePath -Append
