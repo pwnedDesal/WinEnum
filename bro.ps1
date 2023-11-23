@@ -111,9 +111,9 @@ if (-not (Get-Module -Name ActiveDirectory -ListAvailable)) {
 }
 else {
 	Write-Host "Microsoft.ActiveDirectory.Management.dll is already loaded."
-	$user=Get-DomainObject("User")
+	$user = Get-DomainObject -ObjectType "User"
 	Write-host $user |  Out-File -FilePath $filePath -Append
-	$computer = Get-DomainObject("Computer")
+	$computer = Get-DomainObject -ObjectType "Computer"
 	Write-host $computer |  Out-File -FilePath $filePath -Append
 	Write-Host "#List Delegation vulnerabilities" | Out-File -FilePath $filePath -Append
 	$text = "List computer that is trusted for delegation, UNconstrained Delegation" |  Out-File -FilePath $filePath -Append
@@ -135,11 +135,29 @@ else {
 		$text |  Out-File -FilePath $filePath -Append
 	}
 	$text = "Resource Based Delegation" |  Out-File -FilePath $filePath -Append
+	#access the saved users and computer. domainUsers.txt & domainComputers.txt
+	$users = RetrieveObject -filename "domainUsers.txt"
+	$computers = RetrieveObject -filename 'DomainComuters.txt'
+	$allObject=$users+$computers;
+							#######################################
+							####THIS IS THE TWO CONDITION, BRO#####
+							#######################################
 	#list user that has write permission on resource based pc using dc  dsacls "CN=BOB-PC-1,CN=Computers,DC=nukesec,DC=lab" > output.txt
+	DownloadACE -object $allObject -User $true#download ace
+											#retrieve the ACES.TXT
+											#check for the write permission
+
 	#then check if `msDS-AllowedToActOnBehalfOfOtherIdentity` property of resource based pc is null
+	# Get all domain objects with msDS-AllowedToActOnBehalfOfOtherIdentity set to null
+	# Get all computers with resource-based constrained delegation enabled
+	$computers = Get-ADComputer -Filter { msDS-AllowedToActOnBehalfOfOtherIdentity -notlike '*' } |  Out-File -FilePath $filePath -Append
+	# Get all users with resource-based constrained delegation enabled
+	$users = Get-ADUser -Filter { msDS-AllowedToActOnBehalfOfOtherIdentity -notlike '*' } |  Out-File -FilePath $filePath -Append
+	
 
 
 }
+#list all user/computer, and saved it in the directory
 function Get-DomainObject {
 	param(
 		[string]$ObjectType
@@ -169,4 +187,29 @@ function Get-DomainObject {
 		Write-Host "Invalid object type. Please specify 'User' or 'Computer'."
 	}
  return $objects
+}
+function DownloadACE{
+	param(
+		[string]$object,
+		[bool]$User #set this to true to donwload users
+	)
+	$delimiter="."
+	$targetDomain = $DomainName -split $delimiter
+	Write-Host "_________NEW-OBJECT" |  Out-File -FilePath "ACES.txt" -Append
+	if($user){
+		dsacls "CN="+$object+"CN=Users,DC="+$targetDomain[0]+",DC="+$targetDomain[1] |  Out-File -FilePath "ACES.txt" -Append
+	}
+	else{
+		dsacls "CN="+$object+"CN=Computers,DC="+$targetDomain[0]+",DC="+$targetDomain[1] | Out-File -FilePath "ACES.txt" -Append
+	}
+	
+
+}
+function RetrieveObject{#retrieve Objects(users and computers)
+	param(
+		[string]$filename
+	)
+	$filePath = $filename
+	$fileContent = Get-Content -Path $filePath
+	return $fileContent
 }
