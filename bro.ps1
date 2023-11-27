@@ -58,17 +58,21 @@ function DownloadACE {
 	Write-Host $targetDomain[0]
 	Write-Host $targetDomain[1]
 	foreach ($object in $objects) {
-		Write-Host "_________NEW-OBJECT" |  Out-File -FilePath "ACES.txt" -Append
+		$output = "_________NEW-OBJECT"
+		Write-Host $output |  Out-File -FilePath "ACES.txt" -Append
 		Write-Host "Object value: $object"
 		$first = $targetDomain[0]
 		$second = $targetDomain[1]
 		if ($user) {
-			$dn = "CN=$object,CN=Users,DC=$first,DC=$second"
+			$dn = Get-ADUser -Filter { SamAccountName -like $object } | Select-Object -ExpandProperty DistinguishedName
+			Write-Host "hello,user"
 			Write-Host $dn
 			dsacls $dn |  Out-File -FilePath "ACES.txt" -Append
 		}
 		else {
-			$dn = "CN=$object,CN=Computers,DC=$first,DC=$second"
+			#$dn = "CN=$object,CN=Computers,DC=$first,DC=$second"
+			$dn = Get-ADComputer -Filter { SamAccountName -like $object } | Select-Object -ExpandProperty DistinguishedName
+			Write-Host $dn
 			dsacls $dn | Out-File -FilePath "ACES.txt" -Append
 		}
 	
@@ -77,6 +81,7 @@ function DownloadACE {
 }
 function RetrieveObject {
 	#retrieve Objects(users and computers) and filter it `write` permssion
+	#replace the $username here
 	param(
 		[string]$filename,
 		[string]$username
@@ -223,22 +228,28 @@ else {
 		$text |  Out-File -FilePath $filePath -Append
 	}
 	Write-Host "## Resource Based Delegation" |  Out-File -FilePath $filePath -Append
-	#access the saved users and computer. domainUsers.txt & domainComputers.txt
-	$users = Get-Content -Path "domainUsers.txt"
-	$computers = Get-Content -Path 'DomainComputers.txt'
 	#######################################
 	####These are THE TWO CONDITION, BRO#####
 	#######################################
-	#list user that has write permission on resource based pc using dc  dsacls "CN=BOB-PC-1,CN=Computers,DC=nukesec,DC=lab" > output.txt
-	DownloadACE -objects $users -User $true #download ace
-	DownloadACE -objects $computers #download ace
-	#retrieve the ACES.TXT with `write` permission
-	RetrieveObject -filename "ACES.TXT" | Out-File -FilePath $filePath -Append
 	#then check if `msDS-AllowedToActOnBehalfOfOtherIdentity` property of resource based pc is null
-	$computers = Get-ADComputer -Filter { msDS-AllowedToActOnBehalfOfOtherIdentity -notlike '*' } |  Out-File -FilePath $filePath -Append
+	$computers = Get-ADComputer -Filter { msDS-AllowedToActOnBehalfOfOtherIdentity -notlike '*' }  | Select-Object -ExpandProperty SamAccountName
 	# Get all users with resource-based constrained delegation enabled
-	$users = Get-ADUser -Filter { msDS-AllowedToActOnBehalfOfOtherIdentity -notlike '*' } |  Out-File -FilePath $filePath -Append
+	$users = Get-ADUser -Filter { msDS-AllowedToActOnBehalfOfOtherIdentity -notlike '*' }  | Select-Object -ExpandProperty SamAccountName
+	Write-Host $users |  Out-File -FilePath $filePath -Append
+	$targetedObj = $computers + $users
+	Write-Host "dfdf"
+	Write-Host $computers
 
+	#list user that has write permission on resource based pc using dc  dsacls "CN=BOB-PC-1,CN=Computers,DC=nukesec,DC=lab" > output.txt
+	if ($targetedObj.Count -ne 0) {
+		DownloadACE -objects $users -User $true #download ace
+		DownloadACE -objects $computers #download ace
+		#retrieve the ACES.TXT with `write` permission. you can also specifiy the computer/user here
+		RetrieveObject -filename "ACES.TXT" | Out-File -FilePath $filePath -Append
+		#new method -> 
+		#download mo lang yung ACEs ng my `msDS-AllowedToActOnBehalfOfOtherIdentity`
+	}
+	
 	
 
 
