@@ -1,7 +1,8 @@
 
 param (
 	[string]$DomainName,
-	[string]$adsiURL
+	[string]$adsiURL,
+	[string]$username#this is for aces searhes for `write' permission
 )
 <# 
 				#############
@@ -58,8 +59,8 @@ function DownloadACE {
 	Write-Host $targetDomain[0]
 	Write-Host $targetDomain[1]
 	foreach ($object in $objects) {
-		$output = "_________NEW-OBJECT"
-		Write-Host $output |  Out-File -FilePath "ACES.txt" -Append
+		$output = "ACE for {0}" -f $object
+		$output |  Out-File -FilePath "ACES.txt" -Append
 		Write-Host "Object value: $object"
 		$first = $targetDomain[0]
 		$second = $targetDomain[1]
@@ -67,7 +68,8 @@ function DownloadACE {
 			$dn = Get-ADUser -Filter { SamAccountName -like $object } | Select-Object -ExpandProperty DistinguishedName
 			Write-Host "hello,user"
 			Write-Host $dn
-			dsacls $dn |  Out-File -FilePath "ACES.txt" -Append
+			$result = dsacls $dn
+			$result |  Out-File -FilePath "ACES.txt" -Append
 		}
 		else {
 			#$dn = "CN=$object,CN=Computers,DC=$first,DC=$second"
@@ -75,6 +77,7 @@ function DownloadACE {
 			Write-Host $dn
 			dsacls $dn | Out-File -FilePath "ACES.txt" -Append
 		}
+		
 	
 	}
 
@@ -88,10 +91,16 @@ function RetrieveObject {
 	)
 	$filePath = $filename
 	$fileContent = Get-Content -Path $filePath
+	$aceFor = "";
 	# Iterate through each line in the file
 	for ($i = 0; $i -lt $fileContent.Length; $i++) {
 		$currentLine = $fileContent[$i]
 		$allowRegex = "^Allow (.*{0})" -f $username
+		$aceForUserRegex="ACE\sfor\s({0})" -f "[a-zA-Z0-9]+"
+		if($currentLine -match $aceForUserRegex){
+			$aceFor=$matches[0]
+			Write-Output $aceFor
+		}
 		# Check if the current line starts with "Allow"
 		if ($currentLine -match $allowRegex) {
 			$user = $matches[0]
@@ -99,6 +108,7 @@ function RetrieveObject {
 			$nextLine = $fileContent[$i + 1]
 
 			if ($nextLine -match "WRITE") {
+				Write-Output "ACE for: $aceFor"
 				Write-Output "Trigger: $currentLine"
 				Write-Output  "Selected User: $user"
 				Write-Output "Following Line: $nextLine`n"
