@@ -259,8 +259,26 @@ else {
 		#new method -> 
 		#download mo lang yung ACEs ng my `msDS-AllowedToActOnBehalfOfOtherIdentity`
 	}
-	
-	
+	#checking for Backup Operators Users(privilege Escalation)
+	$BOUser = Get-ADGroupMember -Identity "Backup Operators" | Select-Object -ExpandProperty SamAccountName
+	$text = "#checking for Backup Operators Users(privilege Escalation)"
+	$text | Out-File -FilePath $filePath -Append
+	$BOUser | Out-File -FilePath $filePath -Append
+	#List all user that have SPNs set
+	$UserWithService=Get-ADUser -Filter { ServicePrincipalNames -like "*" } | Select-Object -ExpandProperty SamAccountName
+	$text = "List all user that have SPNs set"
+	$text | Out-File -FilePath $filePath -Append
+	$UserWithService | Out-FIle -FilePath $filePath -Append
+	#List all computer that have SPNs set
+	$ComputerWithService = Get-ADComputer -Filter { ServicePrincipalNames -like "*" } | Select-Object -ExpandProperty SamAccountName
+	$text = "List all user that have SPNs set"
+	$text | Out-File -FilePath $filePath -Append
+	$ComputerWithService | Out-FIle -FilePath $filePath -Append
+	#LIst all computer with LAPS
+	$LapsComputer=Get-ADComputer -filter { ms-Mcs-AdmPwdExpirationTime -like '*' } | Select-Object -ExpandProperty SamAccountName
+	$text = "LIst all computer with LAPS"
+	$text | Out-File -FilePath $filePath -Append
+	$LapsComputer | Out-File -FilePath $filePath -Append
 
 
 }
