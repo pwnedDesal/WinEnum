@@ -117,7 +117,16 @@ function RetrieveObject {
 	}
 
 }
-
+function memberChecker{
+		param(
+		[string]$groupName
+	)
+		#checking for Backup Operators Users(privilege Escalation)
+	$BOUser = Get-ADGroupMember -Identity $groupName | Select-Object -ExpandProperty SamAccountName
+	$text = "#checking for $groupName Users(privilege Escalation)"
+	$text | Out-File -FilePath $filePath -Append
+	$BOUser | Out-File -FilePath $filePath -Append
+}
 $text = "# POWERSHELL VERSION"
 $filePath = "output.txt"
 # Use Out-File to append the text to the file
@@ -260,10 +269,9 @@ else {
 		#download mo lang yung ACEs ng my `msDS-AllowedToActOnBehalfOfOtherIdentity`
 	}
 	#checking for Backup Operators Users(privilege Escalation)
-	$BOUser = Get-ADGroupMember -Identity "Backup Operators" | Select-Object -ExpandProperty SamAccountName
-	$text = "#checking for Backup Operators Users(privilege Escalation)"
-	$text | Out-File -FilePath $filePath -Append
-	$BOUser | Out-File -FilePath $filePath -Append
+	memberChecker -groupName "Backup Operators"
+	#checking for DNSAdmins(privilege Escalation)
+	memberChecker -groupName "DNSAdmins"
 	#List all user that have SPNs set
 	$UserWithService=Get-ADUser -Filter { ServicePrincipalNames -like "*" } | Select-Object -ExpandProperty SamAccountName
 	$text = "List all user that have SPNs set"
@@ -279,6 +287,11 @@ else {
 	$text = "LIst all computer with LAPS"
 	$text | Out-File -FilePath $filePath -Append
 	$LapsComputer | Out-File -FilePath $filePath -Append
+	#PAM Trust
+	$PAM=Get-ADTrust -Filter {(ForestTransitive -eq $True) -and (SIDFilteringQuarantined -eq $False)}
+	$text="	#PAM Trust"
+	$text | Out-File -FilePath $filePath -Append
+	$PAM | Out-File -FilePath $filePath -Append
 
 
 }
