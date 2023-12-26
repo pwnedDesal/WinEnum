@@ -127,8 +127,9 @@ echo ---------------------------------------------------------------------------
 echo [+] Config files >> report.txt 2>nul
 echo --------------------------------------------------------------------------------- >> report.txt 2>nul
 dir /s *pass* == *cred* == *vnc* == *.config* >> report.txt 2>nul
-findstr /si password *.xml *.ini *.txt >> report.txt 2>nul
-findstr /si pass *.xml *.ini *.txt >> report.txt 2>nul
+findstr /si /H password *.xml *.ini *.txt >> report.txt 2>nul
+findstr /si /H pass *.xml *.ini *.txt >> report.txt 2>nul
+findstr /si /m /S /H username *.txt *.xml >> report.txt 2>nul
 reg query HKLM /f password /t REG_SZ /s /reg:64 >> report.txt 2>nul
 reg query HKCU /f password /t REG_SZ /s /reg:64 >> report.txt 2>nul
 type c:\sysprep.inf >> report.txt 2>nul
