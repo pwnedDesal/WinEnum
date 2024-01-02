@@ -1,7 +1,7 @@
 #!/bin/bash
 # Check if the target IP is provided as an argument
 if [ -z "$1" ]; then
-    echo "Usage: $0 <target_ip>  [-a ] [-u=<username>] [-p=<password>] [-d=<domain>] [-r=<file to use for asprep/kerberoasting>] [-b] [-v] "
+    echo "Usage: $0 <target_ip>  [-a [anon enumeration]] [-u=<username>] [-p=<password>] [-d=<domain>] [-r=<file to use for asprep/kerberoasting>] [-b] [-v] "
     exit 1
 fi
 # Function to display verbose messages
@@ -61,6 +61,7 @@ if [ "$anonLoginEnum" == "true" ]; then
     verbose_message "Running nbtscan and enum4linux."
     nbtscan -r "$TARGET_IP" > nbtscan/clientNcomputer
     enum4linux -a "$TARGET_IP" -u $username -p $password > enum4linux/index
+    smbclient -L //$TARGET_IP -N > smbclient/shareAnon
 fi
 #enum4linux -a "$TARGET_IP" -u $username -p $password | grep -i "User" > enum4linux/enumUser
 #BRUTE FORCE HERE
